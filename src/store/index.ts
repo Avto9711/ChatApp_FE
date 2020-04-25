@@ -4,18 +4,23 @@ import Constants from '../utils/Constants'
 import {IUser,IState} from '../utils/CustomTypes'
 
 Vue.use(Vuex)
+const  urlAPI = process.env.VUE_APP_API_URL;
 
 export default new Vuex.Store({
   state: {
     user: sessionStorage.getItem(Constants.USER_KEY) ? JSON.parse(sessionStorage.getItem(Constants.USER_KEY)): {},
+    token: sessionStorage.getItem(Constants.TOKEN) ? sessionStorage.getItem(Constants.TOKEN): null,
   } as IState,
   getters:{
-    getUser: state => state.user
+    getUser: state => state.user,
+    token: state => state.token,
   },
   mutations: {
-    [Constants.LOGIN_DISPATCHER] (state, userInformation) {
-      state.user = userInformation
+    [Constants.LOGIN_DISPATCHER] (state, {user,token}) {
+      state.user = user
+      state.token = token
       sessionStorage.setItem(Constants.USER_KEY, JSON.stringify(state.user))
+      sessionStorage.setItem(Constants.TOKEN, token)
     },    
     [Constants.LOGOUT_DISPATCHER] (state, userInformation) {
       state.user = null
@@ -23,12 +28,30 @@ export default new Vuex.Store({
     }
   },
   actions: {
-    [Constants.LOGIN_DISPATCHER] ({ commit }, { userName, password }) {
+    [Constants.LOGIN_DISPATCHER] ({ commit }, model) {
       return new Promise ((resolve, reject) => {
         try {
-          const userLogged:IUser = { name: userName, id: (userName.split(' ')[1]).toString(), token: 'tokenHere',connectionId:"randomConnectionId"  }
-          commit(Constants.LOGIN_DISPATCHER, userLogged)
-          resolve(userLogged)
+
+          let result =  fetch(urlAPI+"api/Auth",{
+            method: 'POST', // *GET, POST, PUT, DELETE, etc.
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(model)
+          });
+        
+          result
+            .then(resp => resp.json())
+            .then((response:{user:IUser, token:string, error?:string})=>{
+
+              if (response.error) {
+                reject(response.error)
+              }
+              commit(Constants.LOGIN_DISPATCHER, {...response})
+              resolve(response.user)
+            }).catch(err=>  reject(err));
+
+
         } catch (error) {
           reject(error)
         }

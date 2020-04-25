@@ -37,6 +37,7 @@ export default class Login extends Vue {
       const result = await this.$store.dispatch(Constants.LOGIN_DISPATCHER, { ...this.model })
       this.$router.push({name:'ChatRoom'})
     } catch (error) {
+      alert(error);
       throw error
     }
     console.log('login pressed')

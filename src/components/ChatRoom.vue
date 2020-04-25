@@ -134,6 +134,12 @@ export default class ChatRoom extends Vue {
   public selectedChatRoom:ChatRoomModel = null;
   public message = null;
   
+    fetchConfig =  {
+      headers: {
+        'Authorization': 'Bearer '+ this.$store.getters.token
+      }
+        // 'Content-Type': 'application/x-www-form-urlencoded',
+    }
   async mounted() {
     this.chatRooms = await this.getChatRooms();
     this.selectedChatRoom = this.chatRooms[0]
@@ -143,7 +149,7 @@ export default class ChatRoom extends Vue {
 
    public async  getChatRooms():Promise<ChatRoomModel[]>{
     return new Promise((res,rej)=>{
-        fetch(this.apiUrl+"api/ChatRoom")
+        fetch(this.apiUrl+"api/ChatRoom",this.fetchConfig)
           .then(resp => resp.json())
           .then(json => res(json)).then(()=>{
           
@@ -209,7 +215,7 @@ export default class ChatRoom extends Vue {
 
   getLatestMessages(chatRoom:ChatRoomModel):Promise<ChatRoomMessageModel[]>{
     return new Promise((resol, rejec)=>{
-      fetch(`${this.apiUrl}api/ChatRoom/${chatRoom.id}/Messages`)
+      fetch(`${this.apiUrl}api/ChatRoom/${chatRoom.id}/Messages`,this.fetchConfig)
         .then(resp=> resp.json())
         .then(json=> resol(json))
         .catch(err=> rejec(err));
