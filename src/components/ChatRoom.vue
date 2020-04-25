@@ -3,7 +3,7 @@
     <div class="row">
       <div class="offset-sm-1 col-sm-10">
         <div class="btn-panel btn-panel-msg">
-          <a class="btn col-lg-6 text-primary pull-right">Chat Room 1 |  logged as User 1</a>
+          <a v-if="selectedChatRoom" class="btn col-lg-6 text-primary pull-right">{{selectedChatRoom.chatRoomName}} |  {{currentUser.name}}</a>
         </div>
       </div>
     </div>
@@ -11,7 +11,7 @@
       <div class="conversation-wrap col-lg-3">
 
         <div v-for="chatRoom in chatRooms" :key="chatRoom.id" class="media conversation">
-          <a class="pull-left" href="#">
+          <a @click="changeChatRoom(chatRoom)" class="pull-left" href="#">
             <img
               class="media-object"
               data-src="holder.js/64x64"
@@ -28,7 +28,7 @@
 
       <div class="message-wrap col-lg-8">
         <div class="msg-wrap">
-          <div class="media msg">
+          <!-- <div class="media msg">
             <a class="pull-left" href="#">
               <img
                 class="media-object msg"
@@ -68,14 +68,42 @@
                 class="col-lg-10 text-justify ml-2"
               >Arnab Goswami: "Some people close to Congress Party and close to the government had a #secret #meeting in a farmhouse in Maharashtra in which Anna Hazare send some representatives and they had a meeting in the discussed how to go about this all fast and how eventually this will end."</p>
             </div>
+          </div> -->
+
+          <template v-if="chatRoomMessages.length">
+                      <div v-for="message in chatRoomMessages" :key="message.id"  class="media msg">
+            <a class="pull-left" href="#">
+              <img
+                class="media-object msg"
+                data-src="holder.js/64x64"
+                alt="64x64"
+                :src="message.messageFromUser === 'bot' ? `${require('../assets/bot.png')}`:`${require('../assets/user.png')}`"
+              />
+            </a>
+            <div class="media-body">
+              <small class="pull-right time">
+                <i class="fa fa-clock-o"></i> {{message.messageTime}}
+              </small>
+
+              <h5 class="media-heading ml-1">{{message.messageFromUser}}</h5>
+              <p
+                class="col-lg-10 text-justify ml-2"
+              >{{message.message}}</p>
+            </div>
           </div>
+          </template>
+          <template v-else>
+            <p class="text-center">No messages in the current chat room.</p>
+          </template>
+
+
         </div>
 
         <div class="send-wrap">
-          <textarea class="form-control send-message" rows="3" placeholder="Write a reply..."></textarea>
+          <textarea v-model="message" class="form-control send-message" rows="3" placeholder="Write a message..."></textarea>
         </div>
         <div class="btn-panel">
-          <a @click="enrolUserToChatRoom"
+          <a @click="sendMessage"
             class="col-lg-12 text-center btn btn-info send-message-btn text-dark pull-right"
             role="button"
           >
@@ -92,57 +120,105 @@
 import { Component, Vue } from 'vue-property-decorator'
 import * as signalR from '@microsoft/signalr';
 import ChatRoomModel from '../model/ChatRoomModel'
+import ChatRoomMessageModel from '../model/ChatRoomMessageModel'
+import {IUser} from '../utils/CustomTypes'
+import CONSTANTS from '../utils/Constants';
 @Component({})
 export default class ChatRoom extends Vue {
   public apiUrl = process.env.VUE_APP_API_URL;
   // public connection!: signalR.HubConnectionBuilder;
   connection: signalR.HubConnection;
-  public currentUser = this.$store.getters.getUser;
+  public currentUser = this.$store.getters.getUser as IUser;
   public chatRooms:ChatRoomModel[] =[]
-
+  public chatRoomMessages:ChatRoomMessageModel[] =[]
+  public selectedChatRoom:ChatRoomModel = null;
+  public message = null;
+  
   async mounted() {
-    await this.loadChatRooms();
-    console.log(this.chatRooms);
-    this.initSignalR();
-
+    this.chatRooms = await this.getChatRooms();
+    this.selectedChatRoom = this.chatRooms[0]
+    await this.initSignalR();
+    await this.initializeChatRoom()
   }
 
-   public async  loadChatRooms(){
+   public async  getChatRooms():Promise<ChatRoomModel[]>{
     return new Promise((res,rej)=>{
         fetch(this.apiUrl+"api/ChatRoom")
           .then(resp => resp.json())
-          .then(json => this.chatRooms = json).then(()=>{
-          res()
+          .then(json => res(json)).then(()=>{
+          
       }).catch(err => rej(err));
     })
+  }
 
-
+  changeChatRoom(chatRoom: ChatRoomModel){
+      this.selectedChatRoom = chatRoom;
+      this.initializeChatRoom();
   }
 
 
-  public initializeChatRoom(chatRoom:ChatRoomModel){
+  public async initializeChatRoom(){
+      this.enrolUserToChatRoom(this.selectedChatRoom);
+      this.chatRoomMessages = await this.getLatestMessages(this.selectedChatRoom);
+  }
 
+  public sendMessage(){
+    this.connection.invoke(CONSTANTS.SND_MESSAGE,this.selectedChatRoom.chatRoomCode,this.currentUser.name,this.message)
+    .then((resp)=>{
+      this.message = null;
+    })
+    .catch(function (err) {
+        return console.error(err.toString());
+    });
   }
 
 
   public initSignalR(){
-    this.connection = new signalR.HubConnectionBuilder()
-    .withUrl(this.apiUrl + "chatHub")
-    .build();
+        let self = this;
 
-      this.connection.on("ReceiveMessage", function (user, message) {
-        console.log(message,user);
-      });
+    return new Promise((resolv,reject)=>{
+      this.connection = new signalR.HubConnectionBuilder()
+      .withUrl(this.apiUrl + "chatHub")
+      .build();
+        this.connection.on(CONSTANTS.ON_MSG_RECVD, function (user, message,chatRoom, messageTime) {
+          const messageId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+          self.chatRoomMessages.push({
+            id: messageId,
+            message,
+            messageFromUser:user,
+            messageTime: messageTime,
+            chatRoomId: chatRoom
+          })
+           console.log(message,user,chatRoom);
+        });
+
+        this.connection.on(CONSTANTS.ON_USR_ENRLLMENT_RECVD, function (message) {
+          console.log(message);
+        });
 
       this.connection.start().then(function(){
-          console.log("Connection established")
+            console.log("Connection established")
+            resolv()
         }).catch(function (err) {
+          reject(err)
             return console.error(err.toString());
         });
+    })
+
+  }
+
+  getLatestMessages(chatRoom:ChatRoomModel):Promise<ChatRoomMessageModel[]>{
+    return new Promise((resol, rejec)=>{
+      fetch(`${this.apiUrl}api/ChatRoom/${chatRoom.id}/Messages`)
+        .then(resp=> resp.json())
+        .then(json=> resol(json))
+        .catch(err=> rejec(err));
+      });
   }
 
   enrolUserToChatRoom(chatRoom:ChatRoomModel){
-    this.connection.invoke("SendMessage", "user", "message").catch(function (err) {
+    this.connection.invoke(CONSTANTS.ENRLLMENT_GROUP, chatRoom.chatRoomCode,this.currentUser.connectionId)
+    .catch(function (err) {
         return console.error(err.toString());
     });
   }
@@ -172,7 +248,7 @@ export default class ChatRoom extends Vue {
 }
 .msg-wrap {
   padding: 10px;
-  max-height: 400px;
+  max-height: 600px;
   overflow: auto;
 }
 
