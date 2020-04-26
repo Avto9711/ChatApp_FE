@@ -10,26 +10,34 @@
     <div class="row">
       <div class="conversation-wrap col-lg-3">
 
-        <div v-for="chatRoom in chatRooms" :key="chatRoom.id" class="media conversation">
-          <a @click="changeChatRoom(chatRoom)" class="pull-left" href="#">
-            <img
-              class="media-object"
-              data-src="holder.js/64x64"
-              alt="64x64"
-              src="../assets/chatroom.png"
-            />
-          </a>
-          <div class="media-body mt-4">
-            <h5 class="media-heading">{{chatRoom.chatRoomName}}</h5>
-          </div>
-        </div>
+        <template v-if="chatRooms.length">
+            <div v-for="chatRoom in chatRooms" :key="chatRoom.id" class="media conversation">
+              <a @click="changeChatRoom(chatRoom)" class="pull-left" href="#">
+                <img
+                  class="media-object"
+                  data-src="holder.js/64x64"
+                  alt="64x64"
+                  src="../assets/chatroom.png"
+                />
+              </a>
+              <div class="media-body mt-4">
+                <h5 class="media-heading">{{chatRoom.chatRoomName}}</h5>
+              </div>
+            </div>
+        </template>
+        <template v-else>
+          <p class="text-center mt-2">Not availables messages chat room.</p>
+        </template>
+
+          <h5 class="mt-1">Available Bot commands</h5>
+          <h6>1. Stock information  <b-badge class="c-pointer" @click="insertComand('/stock=stock_code')">/stock=stock_code</b-badge></h6>
 
       </div>
 
       <div class="message-wrap col-lg-8">
         <div id="msg-wrap" class="msg-wrap">
           <template v-if="chatRoomMessages.length">
-                      <div v-for="message in chatRoomMessages" :key="message.id"  class="media msg">
+            <div v-for="message in chatRoomMessages" :key="message.id"  class="media msg">
             <a class="pull-left" href="#">
               <img
                 class="media-object msg"
@@ -121,6 +129,11 @@ export default class ChatRoom extends Vue {
   }
 
 
+  insertComand(command){
+    this.message=command
+  }
+
+
   public async initializeChatRoom(){
       this.enrolUserToChatRoom(this.selectedChatRoom);
       this.chatRoomMessages = await this.getLatestMessages(this.selectedChatRoom);
@@ -149,9 +162,10 @@ export default class ChatRoom extends Vue {
 
       this.connection.onclose(error => {
         console.assert(this.connection.state === signalR.HubConnectionState.Disconnected);
-        console.log(`Connection closed due to error "${error}". Try refreshing this page to restart the connection.`);
+        console.log(`Connection closed due to error. Try refreshing this page to restart the connection.`);
     });
         this.connection.on(CONSTANTS.ON_MSG_RECVD, function (message) {
+          //tempId
           const messageId = Math.random().toString(36).substring(2) + Date.now().toString(36);
           self.chatRoomMessages.push({
             id: messageId,
@@ -332,5 +346,9 @@ body::-webkit-scrollbar {
 }
 ::-webkit-scrollbar-thumb:window-inactive {
   background: #ddd;
+}
+
+.c-pointer{
+  cursor: pointer;
 }
 </style>
