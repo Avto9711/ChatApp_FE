@@ -27,49 +27,7 @@
       </div>
 
       <div class="message-wrap col-lg-8">
-        <div class="msg-wrap">
-          <!-- <div class="media msg">
-            <a class="pull-left" href="#">
-              <img
-                class="media-object msg"
-                data-src="holder.js/64x64"
-                alt="64x64"
-                src="../assets/user.png"
-              />
-            </a>
-            <div class="media-body">
-              <small class="pull-right time">
-                <i class="fa fa-clock-o"></i> 12:10am
-              </small>
-
-              <h5 class="media-heading ml-1">User 1</h5>
-              <p
-                class="col-lg-10 text-justify ml-2"
-              >Arnab Goswami: "Some people close to Congress Party and close to the government had a #secret #meeting in a farmhouse in Maharashtra in which Anna Hazare send some representatives and they had a meeting in the discussed how to go about this all fast and how eventually this will end."</p>
-            </div>
-          </div>
-
-          <div class="media msg">
-            <a class="pull-left" href="#">
-              <img
-                class="media-object msg"
-                data-src="holder.js/64x64"
-                alt="64x64"
-                src="../assets/bot.png"
-              />
-            </a>
-            <div class="media-body">
-              <small class="pull-right time">
-                <i class="fa fa-clock-o"></i> 12:10am
-              </small>
-
-              <h5 class="media-heading ml-1">Bot</h5>
-              <p
-                class="col-lg-10 text-justify ml-2"
-              >Arnab Goswami: "Some people close to Congress Party and close to the government had a #secret #meeting in a farmhouse in Maharashtra in which Anna Hazare send some representatives and they had a meeting in the discussed how to go about this all fast and how eventually this will end."</p>
-            </div>
-          </div> -->
-
+        <div id="msg-wrap" class="msg-wrap">
           <template v-if="chatRoomMessages.length">
                       <div v-for="message in chatRoomMessages" :key="message.id"  class="media msg">
             <a class="pull-left" href="#">
@@ -100,7 +58,7 @@
         </div>
 
         <div class="send-wrap">
-          <textarea v-model="message" class="form-control send-message" rows="3" placeholder="Write a message..."></textarea>
+          <textarea @keypress.enter="sendMessage" v-model="message" class="form-control send-message" rows="3" placeholder="Write a message..."></textarea>
         </div>
         <div class="btn-panel">
           <a @click="sendMessage"
@@ -185,17 +143,29 @@ export default class ChatRoom extends Vue {
     return new Promise((resolv,reject)=>{
       this.connection = new signalR.HubConnectionBuilder()
       .withUrl(this.apiUrl + "chatHub")
+      .configureLogging(signalR.LogLevel.Trace)
+      .withAutomaticReconnect()
       .build();
-        this.connection.on(CONSTANTS.ON_MSG_RECVD, function (user, message,chatRoom, messageTime) {
+
+      this.connection.onclose(error => {
+        console.assert(this.connection.state === signalR.HubConnectionState.Disconnected);
+        console.log(`Connection closed due to error "${error}". Try refreshing this page to restart the connection.`);
+    });
+        this.connection.on(CONSTANTS.ON_MSG_RECVD, function (message) {
           const messageId = Math.random().toString(36).substring(2) + Date.now().toString(36);
           self.chatRoomMessages.push({
             id: messageId,
-            message,
-            messageFromUser:user,
-            messageTime: messageTime,
-            chatRoomId: chatRoom
+            message:message.message,
+            messageFromUser:message.sender,
+            messageTime: message.messageDate,
+            chatRoomId: message.chatRoomId
+          });
+          self.$nextTick().then(r => {
+          var chatWrapper = document.getElementById('msg-wrap');
+                chatWrapper.scrollTop = chatWrapper.scrollHeight;
           })
-           console.log(message,user,chatRoom);
+
+           console.log(message);
         });
 
         this.connection.on(CONSTANTS.ON_USR_ENRLLMENT_RECVD, function (message) {
@@ -223,8 +193,10 @@ export default class ChatRoom extends Vue {
   }
 
   enrolUserToChatRoom(chatRoom:ChatRoomModel){
-    this.connection.invoke(CONSTANTS.ENRLLMENT_GROUP, chatRoom.chatRoomCode,this.currentUser.connectionId)
+    console.log(CONSTANTS.ENRLLMENT_GROUP);
+    this.connection.invoke(CONSTANTS.ENRLLMENT_GROUP, chatRoom.chatRoomCode)
     .catch(function (err) {
+      debugger
         return console.error(err.toString());
     });
   }
