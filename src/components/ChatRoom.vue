@@ -48,7 +48,7 @@
             </a>
             <div class="media-body">
               <small class="pull-right time">
-                <i class="fa fa-clock-o"></i> {{message.messageTime}}
+                <i class="fa fa-clock-o"></i> {{message.messageTime | dateFilter}} 
               </small>
 
               <h5 class="media-heading ml-1">{{message.messageFromUser}}</h5>
@@ -89,7 +89,15 @@ import ChatRoomModel from '../model/ChatRoomModel'
 import ChatRoomMessageModel from '../model/ChatRoomMessageModel'
 import {IUser} from '../utils/CustomTypes'
 import CONSTANTS from '../utils/Constants';
-@Component({})
+import { format } from 'date-fns'
+
+@Component({
+  filters:{
+    dateFilter:function(date ){
+        return format(new Date(date),  'yyyy-MM-dd HH:mm')
+    }
+  }
+})
 export default class ChatRoom extends Vue {
   public apiUrl = process.env.VUE_APP_API_URL;
   // public connection!: signalR.HubConnectionBuilder;
